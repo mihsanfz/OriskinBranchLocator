@@ -453,6 +453,29 @@ h1 {
   white-space: nowrap;
 }
 
+.status-badge {
+  padding: 3px 7px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-ya {
+  color: #087a54;
+  background: #e4f8ef;
+}
+
+.status-tidak {
+  color: #b4232d;
+  background: #ffe7e8;
+}
+
+.status-stop {
+  color: #665d60;
+  background: #eee9ea;
+}
+
 .distance {
   padding-top: 2px;
   color: var(--coral-dark);
@@ -597,6 +620,14 @@ h1 {
   font-size: 12px;
   font-weight: 700;
   transform: rotate(-45deg);
+}
+
+.clinic-marker-tidak {
+  background: #e3444d;
+}
+
+.clinic-marker-stop {
+  background: #756b6e;
 }
 
 .clinic-marker::first-letter {

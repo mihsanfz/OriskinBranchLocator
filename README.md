@@ -34,12 +34,14 @@ di spreadsheet, lalu muat ulang locator untuk melihat perubahannya.
    | `phone` | Tidak | Nomor telepon |
    | `whatsapp` | Tidak | Nomor WhatsApp format internasional, tanpa `+` |
    | `google_maps` | Tidak | Link Google Maps klinik; boleh dikosongkan |
+   | `status` | Tidak | `ya` = berjalan, `tidak` = tidak ikut program (merah), `stop` = berhenti |
    | `keywords` | Tidak | Kata pencarian tambahan, pisahkan dengan koma |
 
    Nama header Indonesia seperti `Nama Klinik`, `Kota`, `Alamat`, `Jam
    Operasional`, `Telepon`, `WhatsApp`, `Google Maps`, `Latitude`, `Longitude`,
-   dan `Kata Kunci` juga dikenali. `id`, `name`, `city`, `address`, `latitude`,
-   dan `longitude` tetap wajib.
+   `Status`, dan `Kata Kunci` juga dikenali. `id`, `name`, `city`, `address`,
+   `latitude`, dan `longitude` tetap wajib. Kolom `status` boleh dikosongkan
+   (dianggap `ya`); isinya tidak peka huruf besar/kecil.
 4. Nilai `spreadsheetId` dan `gid` di `clinics.js` harus sesuai dengan URL
    spreadsheet. Untuk tautan yang diberikan, ID dan `gid` sudah diisi.
 5. Buka locator melalui server lokal atau hosting, lalu muat ulang halaman.
@@ -51,4 +53,5 @@ menampilkan alasan data gagal dimuat. Pastikan koordinat berada pada rentang
 latitude `-90` sampai `90` dan longitude `-180` sampai `180`.
 Tombol Google Maps menggunakan link pada kolom `google_maps` jika diisi; jika
 kosong, locator mencari berdasarkan nama klinik, alamat, dan kota, bukan
-koordinat.
+koordinat. Status tampil pada kartu dan marker peta; klinik dengan status apa
+pun tetap ditampilkan dan bisa diklik.

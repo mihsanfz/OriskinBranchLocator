@@ -84,6 +84,7 @@
       hours: column("hours", "jam", "jamoperasional", "operationalhours"),
       phone: column("phone", "telepon", "nomortelepon", "nohp"),
       whatsapp: column("whatsapp", "wa", "nomorwhatsapp"),
+      status: column("status", "statusklinik", "keikutsertaan", "statusprogram"),
       mapsUrl: column("googlemaps", "googlemapslink", "mapslink", "linkgooglemaps", "linkmaps"),
       latitude: column("latitude", "lat"),
       longitude: column("longitude", "lng", "lon", "long"),
@@ -105,6 +106,7 @@
       const name = cell("name");
       const city = cell("city");
       const address = cell("address");
+      const rawStatus = cell("status").toLocaleLowerCase("id");
       const mapsUrl = cell("mapsUrl");
       const latitudeValue = cell("latitude");
       const longitudeValue = cell("longitude");
@@ -115,6 +117,17 @@
         throw new Error(`ID, nama, kota, dan alamat wajib diisi (baris ${rowNumber}).`);
       }
       if (ids.has(id)) throw new Error(`ID klinik "${id}" duplikat (baris ${rowNumber}).`);
+      const status =
+        rawStatus === "" || rawStatus === "ya" || rawStatus === "berjalan"
+          ? "ya"
+          : rawStatus === "tidak" || rawStatus === "tidak ikut program"
+            ? "tidak"
+            : rawStatus === "stop" || rawStatus === "berhenti"
+              ? "stop"
+              : "";
+      if (!status) {
+        throw new Error(`Status harus "ya", "tidak", atau "stop" (baris ${rowNumber}).`);
+      }
       if (mapsUrl) {
         let parsedMapsUrl;
         try {
@@ -149,6 +162,7 @@
         name,
         city,
         address,
+        status,
         mapsUrl,
         hours: cell("hours"),
         phone: cell("phone"),
@@ -223,15 +237,23 @@
     )}`;
   }
 
+  function getStatusLabel(status) {
+    return {
+      ya: "Berjalan",
+      tidak: "Tidak ikut program",
+      stop: "Berhenti",
+    }[status];
+  }
+
   function createMarker(clinic, index) {
     const markerIcon = L.divIcon({
       className: "clinic-marker-wrap",
-      html: `<span class="clinic-marker">${index === 0 ? "★" : index + 1}</span>`,
+      html: `<span class="clinic-marker clinic-marker-${clinic.status}">${index === 0 ? "★" : index + 1}</span>`,
       iconSize: [34, 34],
       iconAnchor: [17, 17],
     });
     return L.marker(clinic.coordinates, { icon: markerIcon }).bindPopup(
-      `<strong>${escapeHtml(clinic.name)}</strong><br>${escapeHtml(clinic.address)}`,
+      `<strong>${escapeHtml(clinic.name)}</strong><br>${escapeHtml(clinic.address)}<br><span>${getStatusLabel(clinic.status)}</span>`,
     );
   }
 
@@ -260,19 +282,23 @@
       const card = document.createElement("article");
       card.className = "clinic-card";
       card.tabIndex = 0;
-      card.setAttribute("aria-label", `${clinic.name}, ${formatDistance(clinic.distance)}`);
+      card.setAttribute(
+        "aria-label",
+        `${clinic.name}, ${getStatusLabel(clinic.status)}, ${formatDistance(clinic.distance)}`,
+      );
       card.innerHTML = `
         <div class="card-heading">
           <span class="rank-badge ${index === 0 ? "rank-featured" : ""}">${index === 0 ? "★" : index + 1}</span>
           <div class="clinic-title">
             <strong>${escapeHtml(clinic.name)}</strong>
             ${index === 0 ? '<span class="nearest-badge">⭐ Terdekat</span>' : ""}
+            <span class="status-badge status-${clinic.status}">${getStatusLabel(clinic.status)}</span>
             <span>${escapeHtml(clinic.city)}</span>
           </div>
           <div class="distance">${formatDistance(clinic.distance)}<small>~${Math.max(1, Math.round(clinic.distance / 0.8))} menit</small></div>
         </div>
         <p class="clinic-detail"><span aria-hidden="true">♧</span>${escapeHtml(clinic.address)}</p>
-        <p class="clinic-detail"><span aria-hidden="true">◷</span>${clinic.hours ? `${escapeHtml(clinic.hours)} <span class="open-badge"><i></i> Buka</span>` : "Jam operasional belum tersedia"}</p>
+        <p class="clinic-detail"><span aria-hidden="true">◷</span>${escapeHtml(clinic.hours || "Jam operasional belum tersedia")}</p>
         <p class="clinic-detail"><span aria-hidden="true">♧</span>${escapeHtml(clinic.phone || "Nomor telepon belum tersedia")}</p>
         <div class="card-actions${clinic.whatsapp ? " has-whatsapp" : ""}">
           <a class="maps-button" href="${escapeHtml(getMapsUrl(clinic))}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">↗</span> Google Maps</a>
