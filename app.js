@@ -274,10 +274,11 @@
         <p class="clinic-detail"><span aria-hidden="true">♧</span>${escapeHtml(clinic.address)}</p>
         <p class="clinic-detail"><span aria-hidden="true">◷</span>${clinic.hours ? `${escapeHtml(clinic.hours)} <span class="open-badge"><i></i> Buka</span>` : "Jam operasional belum tersedia"}</p>
         <p class="clinic-detail"><span aria-hidden="true">♧</span>${escapeHtml(clinic.phone || "Nomor telepon belum tersedia")}</p>
-        <div class="card-actions">
+        <div class="card-actions${clinic.whatsapp ? " has-whatsapp" : ""}">
           <a class="maps-button" href="${escapeHtml(getMapsUrl(clinic))}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">↗</span> Google Maps</a>
           ${clinic.whatsapp ? `<a class="whatsapp-button" href="https://wa.me/${encodeURIComponent(clinic.whatsapp)}" target="_blank" rel="noopener noreferrer" aria-label="Hubungi ${escapeHtml(clinic.name)} melalui WhatsApp">◔ WA</a>` : ""}
           <button class="copy-button" type="button" data-copy="${escapeHtml(clinic.address)}">▢ Salin</button>
+          ${clinic.whatsapp ? '<button class="copy-button copy-whatsapp-button" type="button">▢ Salin WA</button>' : ""}
         </div>`;
 
       card.addEventListener("click", (event) => {
@@ -298,6 +299,17 @@
           showToast("Tidak dapat menyalin alamat. Silakan salin secara manual.");
         }
       });
+      const copyWhatsappButton = card.querySelector(".copy-whatsapp-button");
+      if (copyWhatsappButton) {
+        copyWhatsappButton.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(clinic.whatsapp);
+            showToast("Nomor WhatsApp berhasil disalin");
+          } catch (error) {
+            showToast("Tidak dapat menyalin nomor WhatsApp. Silakan salin secara manual.");
+          }
+        });
+      }
       clinicList.append(card);
     });
 

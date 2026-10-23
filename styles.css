@@ -517,6 +517,10 @@ h1 {
   margin-top: 12px;
 }
 
+.card-actions.has-whatsapp {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .card-actions a,
 .card-actions button {
   display: flex;
