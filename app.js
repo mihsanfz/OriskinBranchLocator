@@ -730,6 +730,17 @@
     }
     window.open(adminWebAppUrl, "_blank", "noopener,noreferrer");
   });
+  document.querySelector("#change-request-button").addEventListener("click", () => {
+    const { adminWebAppUrl } = window.ORISKIN_SHEET || {};
+    if (!adminWebAppUrl) {
+      logsStatus.textContent =
+        "Formulir pengajuan belum dikonfigurasi. Isi adminWebAppUrl di clinics.js setelah Apps Script Web App di-deploy.";
+      return;
+    }
+    const requestUrl = new URL(adminWebAppUrl);
+    requestUrl.searchParams.set("page", "request");
+    window.open(requestUrl.toString(), "_blank", "noopener,noreferrer");
+  });
   logsDialog.addEventListener("click", (event) => {
     if (event.target === logsDialog) logsDialog.close();
   });

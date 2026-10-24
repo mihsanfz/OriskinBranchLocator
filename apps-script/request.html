@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, sans-serif;
+        color: #28242a;
+        background: #fff7f6;
+      }
+
+      body {
+        margin: 0;
+        padding: 28px 16px;
+      }
+
+      main {
+        width: min(100%, 560px);
+        margin: 0 auto;
+        padding: 24px;
+        border: 1px solid #f0e5e3;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 12px 40px #42201b0d;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+      }
+
+      p {
+        color: #806d6b;
+        line-height: 1.5;
+      }
+
+      label {
+        display: block;
+        margin: 16px 0 6px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        padding: 11px 12px;
+        border: 1px solid #e8d9d7;
+        border-radius: 10px;
+        box-sizing: border-box;
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 130px;
+        resize: vertical;
+      }
+
+      button {
+        min-height: 42px;
+        margin-top: 18px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 22px;
+        color: #fff;
+        background: #f26165;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: .65;
+      }
+
+      #status {
+        min-height: 20px;
+        margin-top: 14px;
+        font-size: 13px;
+      }
+
+      #status.error {
+        color: #b4232d;
+      }
+
+      #status.success {
+        color: #087a54;
+      }
+
+      .counter {
+        margin: 6px 0 0;
+        font-size: 12px;
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Ajukan Perubahan Klinik</h1>
+      <p>Isi formulir ini untuk mengajukan perubahan. Pengajuan akan ditinjau administrator dan tidak langsung mengubah data klinik.</p>
+
+      <form id="request-form">
+        <label for="name">Nama pengaju</label>
+        <input id="name" name="name" maxlength="100" autocomplete="name" required />
+
+        <label for="contact">Kontak yang bisa dihubungi (opsional)</label>
+        <input id="contact" name="contact" maxlength="100" autocomplete="tel" />
+
+        <label for="clinic">Nama klinik</label>
+        <input id="clinic" name="clinic" maxlength="150" required />
+
+        <label for="details">Rincian perubahan yang diajukan</label>
+        <textarea id="details" name="details" maxlength="1500" placeholder="Jelaskan data yang perlu diperbarui dan informasi yang benar." required></textarea>
+        <p class="counter"><span id="character-count">0</span>/1500 karakter</p>
+
+        <button type="submit">Kirim Pengajuan</button>
+      </form>
+      <div id="status" role="status" aria-live="polite"></div>
+    </main>
+    <script>
+      const form = document.querySelector("#request-form");
+      const details = document.querySelector("#details");
+      const status = document.querySelector("#status");
+
+      details.addEventListener("input", () => {
+        document.querySelector("#character-count").textContent = details.value.length;
+      });
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const button = form.querySelector("button");
+        button.disabled = true;
+        status.className = "";
+        status.textContent = "Mengirim pengajuan...";
+        google.script.run
+          .withSuccessHandler(() => {
+            form.reset();
+            document.querySelector("#character-count").textContent = "0";
+            status.className = "success";
+            status.textContent = "Pengajuan berhasil dikirim dan akan ditinjau administrator.";
+            button.disabled = false;
+          })
+          .withFailureHandler((error) => {
+            status.className = "error";
+            status.textContent = error.message || "Pengajuan tidak berhasil dikirim. Silakan coba lagi.";
+            button.disabled = false;
+          })
+          .submitChangeRequest(
+            document.querySelector("#name").value,
+            document.querySelector("#contact").value,
+            document.querySelector("#clinic").value,
+            details.value,
+          );
+      });
+    </script>
+  </body>
+</html>

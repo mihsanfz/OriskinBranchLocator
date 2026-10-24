@@ -2,6 +2,17 @@ const ANNOUNCEMENT_LOG_SHEET_NAME = "Log Perubahan";
 const ANNOUNCEMENT_LOG_HEADERS = ["Waktu", "Pengumuman", "Admin"];
 const ADMIN_SESSION_TTL_SECONDS = 3600;
 const ADMIN_MAX_ANNOUNCEMENT_LENGTH = 1000;
+const CHANGE_REQUEST_SHEET_NAME = "Pengajuan Perubahan";
+const CHANGE_REQUEST_HEADERS = [
+  "Waktu Pengajuan",
+  "Nama Pengaju",
+  "Kontak",
+  "Klinik",
+  "Rincian Perubahan",
+  "Status",
+];
+const CHANGE_REQUEST_LIMIT = 5;
+const CHANGE_REQUEST_WINDOW_SECONDS = 3600;
 
 function setupAnnouncementLog() {
   const activeUser = Session.getActiveUser().getEmail();
@@ -22,15 +33,80 @@ function setupAnnouncementLog() {
     .getRange(1, 1, 1, ANNOUNCEMENT_LOG_HEADERS.length)
     .setValues([ANNOUNCEMENT_LOG_HEADERS]);
   sheet.setFrozenRows(1);
+  let requestSheet = spreadsheet.getSheetByName(CHANGE_REQUEST_SHEET_NAME);
+  if (!requestSheet) requestSheet = spreadsheet.insertSheet(CHANGE_REQUEST_SHEET_NAME);
+  requestSheet
+    .getRange(1, 1, 1, CHANGE_REQUEST_HEADERS.length)
+    .setValues([CHANGE_REQUEST_HEADERS]);
+  requestSheet.setFrozenRows(1);
   SpreadsheetApp.getUi().alert(
-    `Sheet "${ANNOUNCEMENT_LOG_SHEET_NAME}" siap. Catat gid ${sheet.getSheetId()} di clinics.js sebagai logGid.`,
+    `Sheet "${ANNOUNCEMENT_LOG_SHEET_NAME}" dan "${CHANGE_REQUEST_SHEET_NAME}" siap.\nCatat gid ${sheet.getSheetId()} di clinics.js sebagai logGid.`,
   );
 }
 
-function doGet() {
+function doGet(event) {
+  if (event && event.parameter && event.parameter.page === "request") {
+    return HtmlService.createHtmlOutputFromFile("request").setTitle(
+      "Ajukan Perubahan Klinik",
+    );
+  }
   return HtmlService.createHtmlOutputFromFile("admin").setTitle(
     "Administrator — Log Perubahan Klinik",
   );
+}
+
+function submitChangeRequest(name, contact, clinic, details) {
+  const cache = CacheService.getScriptCache();
+  const userKey = Session.getTemporaryActiveUserKey() || "anonymous";
+  const attemptKey = `change-request-attempts:${userKey}`;
+  const fields = {
+    name: String(name || "").trim(),
+    contact: String(contact || "").trim(),
+    clinic: String(clinic || "").trim(),
+    details: String(details || "").trim(),
+  };
+  if (!fields.name || !fields.clinic || !fields.details) {
+    throw new Error("Nama, nama klinik, dan rincian perubahan wajib diisi.");
+  }
+  if (fields.name.length > 100 || fields.contact.length > 100 ||
+      fields.clinic.length > 150 || fields.details.length > 1500) {
+    throw new Error("Ada isian yang melebihi batas karakter.");
+  }
+
+  const spreadsheetId = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
+  if (!spreadsheetId) {
+    throw new Error("Pemilik spreadsheet perlu menjalankan setupAnnouncementLog() terlebih dahulu.");
+  }
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = spreadsheet.getSheetByName(CHANGE_REQUEST_SHEET_NAME);
+  if (!sheet) {
+    throw new Error(`Sheet "${CHANGE_REQUEST_SHEET_NAME}" belum dibuat. Hubungi administrator.`);
+  }
+
+  const safeValue = (value) => (/^[=+\-@]/.test(value) ? `'${value}` : value);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const attempts = Number(cache.get(attemptKey) || "0");
+    if (attempts >= CHANGE_REQUEST_LIMIT) {
+      throw new Error("Batas pengajuan tercapai. Silakan coba lagi satu jam kemudian.");
+    }
+    sheet
+      .getRange(sheet.getLastRow() + 1, 1, 1, CHANGE_REQUEST_HEADERS.length)
+      .setValues([[
+        new Date(),
+        safeValue(fields.name),
+        safeValue(fields.contact),
+        safeValue(fields.clinic),
+        safeValue(fields.details),
+        "Menunggu",
+      ]]);
+    cache.put(attemptKey, String(attempts + 1), CHANGE_REQUEST_WINDOW_SECONDS);
+  } finally {
+    lock.releaseLock();
+  }
+
+  return { saved: true };
 }
 
 function loginAdmin(username, password) {

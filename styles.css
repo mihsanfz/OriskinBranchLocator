@@ -778,6 +778,13 @@ h1 {
   line-height: 1.5;
 }
 
+.logs-admin-buttons {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .announcement-list {
   overflow: auto;
   max-height: 56vh;
@@ -942,6 +949,10 @@ h1 {
   .logs-admin-actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .logs-admin-buttons {
+    width: 100%;
   }
 
   .share-button {

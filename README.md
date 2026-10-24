@@ -76,17 +76,23 @@ data OpenStreetMap; atribusi ditampilkan pada peta.
 Log berupa kalimat pengumuman yang ditulis manual oleh administrator, bukan
 rekaman otomatis setiap edit sel. Contoh: `Klinik Kartini sudah tidak beroperasi
 dikarenakan sudah tutup.` Semua pengunjung dapat melihat pengumuman, sedangkan
-penambahan melalui website membutuhkan login administrator.
+penambahan pengumuman melalui website membutuhkan login administrator.
+Pengunjung juga dapat mengirim pengajuan perubahan tanpa login; pengajuan
+tersebut tidak langsung mengubah data klinik dan harus ditinjau administrator.
 
 ### Siapkan sheet
 
 1. Buka **Extensions → Apps Script** dari spreadsheet klinik.
 2. Ganti isi file `Code.gs` dengan `apps-script/announcement-log.gs`, lalu
    tambahkan file HTML bernama `admin` dan salin isi
-   `apps-script/admin.html` ke dalamnya.
+   `apps-script/admin.html` ke dalamnya. Tambahkan file HTML bernama `request`
+   dan salin isi `apps-script/request.html` ke dalamnya.
 3. Pilih fungsi `setupAnnouncementLog`, klik **Run**, dan setujui izin. Fungsi
-   ini membuat sheet `Log Perubahan` dengan kolom `Waktu`, `Pengumuman`, `Admin`
-   serta menyimpan ID spreadsheet untuk dipakai aplikasi.
+   ini membuat sheet `Log Perubahan` dan `Pengajuan Perubahan`, serta menyimpan
+   ID spreadsheet untuk dipakai aplikasi. Sheet pengajuan memiliki kolom
+   `Waktu Pengajuan`, `Nama Pengaju`, `Kontak`, `Klinik`, `Rincian Perubahan`,
+   dan `Status` (awal `Menunggu`). Jalankan fungsi lagi jika sheet pengajuan
+   belum dibuat; pengajuan yang sudah ada tidak dihapus.
 4. Atur **Project Settings → Script Properties** berikut. Gunakan username dan
    password sesuai pilihan; tidak ada batas minimal panjang. Jangan menyimpan
    kredensial di website atau membagikannya ke publik:
@@ -99,21 +105,30 @@ penambahan melalui website membutuhkan login administrator.
 
 ### Aktifkan login di website
 
-1. Di Apps Script pilih **Deploy → New deployment → Web app**.
+1. Untuk pemasangan baru, di Apps Script pilih **Deploy → New deployment → Web
+   app**. Jika Web App sudah pernah di-deploy, pilih **Deploy → Manage
+   deployments → Edit**, lalu pilih **New version** agar URL `/exec` yang sama
+   tetap dapat digunakan.
 2. Pilih **Execute as: Me** agar web app menulis ke spreadsheet pemilik script.
    Atur akses web app ke **Anyone** supaya pengunjung website dapat membuka
-   halaman login. Halaman bisa dibuka publik, tetapi setiap penambahan tetap
-   memerlukan verifikasi username/password di server.
+   halaman login dan formulir pengajuan. Pengunjung dapat mengirim pengajuan
+   tanpa login, sedangkan penambahan pengumuman tetap memerlukan verifikasi
+   username/password di server.
 3. Deploy dan salin URL Web App yang berakhiran `/exec`.
 4. Di Google Sheets, publikasikan tab `Log Perubahan` sebagai CSV.
 5. Isi `logGid` dengan gid tab log dan `adminWebAppUrl` dengan URL Web App di
    `clinics.js`.
 
 Tombol **Log Perubahan** menampilkan hingga 100 pengumuman terbaru. Tombol
-**Login administrator** membuka form login; pengumuman disimpan bersama nama
-admin ke sheet. Form membatasi pengumuman hingga 1000 karakter dan membatasi
-percobaan login. Pastikan sheet log hanya memuat pengumuman yang memang boleh
-dilihat publik.
+**Ajukan Perubahan** membuka formulir publik. Pengaju mengisi nama, nama klinik,
+dan rincian perubahan; kontak boleh dikosongkan. Pengajuan masuk ke sheet
+`Pengajuan Perubahan` dengan status awal `Menunggu`, maksimal lima pengajuan
+per pengguna sementara setiap jam. Pengajuan tidak otomatis mengubah daftar
+klinik; administrator dapat meninjau dan memperbarui statusnya di spreadsheet.
+Tombol **Login Administrator** membuka form login; pengumuman disimpan bersama
+nama admin ke sheet. Form membatasi pengumuman hingga 1000 karakter dan
+membatasi percobaan login. Pastikan sheet log hanya memuat pengumuman yang
+memang boleh dilihat publik.
 
 ## Placeholder logo
 
