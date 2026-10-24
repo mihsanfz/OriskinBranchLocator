@@ -871,10 +871,10 @@ h1 {
   }
 
   .locator {
-    height: calc(100dvh - 52px);
-    min-height: 0;
+    height: auto;
+    min-height: calc(100dvh - 52px);
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(280px, 42dvh) minmax(280px, 1fr);
+    grid-template-rows: minmax(235px, 35dvh) auto;
   }
 
   .map-panel {
@@ -883,8 +883,13 @@ h1 {
 
   .sidebar {
     grid-row: 2;
+    min-height: auto;
     border-top: 1px solid var(--line);
     border-right: 0;
+  }
+
+  .results-panel {
+    flex: 0 0 auto;
   }
 
   .search-panel {
@@ -961,20 +966,14 @@ h1 {
   }
 
   .clinic-list {
-    display: grid;
-    grid-auto-columns: minmax(290px, 86%);
-    grid-auto-flow: column;
-    overflow-x: auto;
-    overflow-y: hidden;
-    align-items: start;
-    gap: 10px;
+    display: block;
+    flex: 0 0 auto;
+    overflow: visible;
     padding: 0 15px 12px;
-    scroll-snap-type: x mandatory;
   }
 
   .clinic-card {
-    margin-bottom: 0;
-    scroll-snap-align: start;
+    margin-bottom: 10px;
   }
 }
 
@@ -1014,7 +1013,7 @@ h1 {
   }
 
   .locator {
-    grid-template-rows: minmax(235px, 35dvh) minmax(320px, 1fr);
+    grid-template-rows: minmax(235px, 35dvh) auto;
   }
 
   .map-result-badge {
