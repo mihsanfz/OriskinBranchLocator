@@ -134,11 +134,13 @@
           ? "ya"
           : rawStatus === "tidak" || rawStatus === "tidak ikut program"
             ? "tidak"
-            : rawStatus === "stop" || rawStatus === "berhenti"
+            : rawStatus === "hold" || rawStatus === "di hold untuk program"
+              ? "hold"
+              : rawStatus === "stop" || rawStatus === "berhenti"
               ? "stop"
               : "";
       if (!status) {
-        throw new Error(`Status harus "ya", "tidak", atau "stop" (baris ${rowNumber}).`);
+        throw new Error(`Status harus "ya", "tidak", "hold", atau "stop" (baris ${rowNumber}).`);
       }
       if (mapsUrl) {
         let parsedMapsUrl;
@@ -223,6 +225,16 @@
     return `${distance < 10 ? distance.toFixed(1) : Math.round(distance)} km`;
   }
 
+  function formatTravelTime(distance) {
+    const totalMinutes = Math.max(1, Math.round(distance / 0.8));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (!hours) return `~${minutes} menit`;
+    if (!minutes) return `~${hours} jam`;
+    return `~${hours} jam ${minutes} menit`;
+  }
+
   function showToast(message) {
     toast.textContent = message;
     toast.classList.add("is-visible");
@@ -253,6 +265,7 @@
     return {
       ya: "Berjalan",
       tidak: "Tidak ikut program",
+      hold: "Di hold untuk program",
       stop: "Berhenti",
     }[status];
   }
@@ -324,7 +337,7 @@
         `${clinic.name}, ${getStatusLabel(clinic.status)}${radiusMode ? `, ${formatDistance(clinic.distance)}` : ""}`,
       );
       const distanceMarkup = radiusMode
-        ? `<div class="distance" title="Jarak garis lurus, bukan rute jalan">${formatDistance(clinic.distance)}<small>~${Math.max(1, Math.round(clinic.distance / 0.8))} menit</small></div>`
+        ? `<div class="distance" title="Jarak garis lurus, bukan rute jalan">${formatDistance(clinic.distance)}<small>${formatTravelTime(clinic.distance)}</small></div>`
         : "";
       card.innerHTML = `
         <div class="card-heading">

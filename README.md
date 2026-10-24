@@ -35,7 +35,7 @@ di spreadsheet, lalu muat ulang locator untuk melihat perubahannya.
    | `phone` | Tidak | Nomor telepon |
    | `whatsapp` | Tidak | Nomor WhatsApp format internasional, tanpa `+` |
    | `google_maps` | Tidak | Link Google Maps klinik; boleh dikosongkan |
-   | `status` | Tidak | `ya` = berjalan, `tidak` = tidak ikut program (merah), `stop` = berhenti |
+   | `status` | Tidak | `ya` = berjalan, `tidak` = tidak ikut program (merah), `hold` = di hold untuk program, `stop` = berhenti |
    | `keywords` | Tidak | Kata pencarian tambahan, pisahkan dengan koma |
 
    Nama header Indonesia seperti `Nama Klinik`, `Kota`, `Alamat`, `Jam

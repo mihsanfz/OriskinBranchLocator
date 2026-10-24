@@ -496,6 +496,11 @@ h1 {
   background: #ffe7e8;
 }
 
+.status-hold {
+  color: #8a5800;
+  background: #fff1cc;
+}
+
 .status-stop {
   color: #665d60;
   background: #eee9ea;
@@ -649,6 +654,10 @@ h1 {
 
 .clinic-marker-tidak {
   background: #e3444d;
+}
+
+.clinic-marker-hold {
+  background: #d99419;
 }
 
 .clinic-marker-stop {
