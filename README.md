@@ -77,10 +77,11 @@ penambahan melalui website membutuhkan login administrator.
 3. Pilih fungsi `setupAnnouncementLog`, klik **Run**, dan setujui izin. Fungsi
    ini membuat sheet `Log Perubahan` dengan kolom `Waktu`, `Pengumuman`, `Admin`
    serta menyimpan ID spreadsheet untuk dipakai aplikasi.
-4. Atur **Project Settings → Script Properties** berikut. Buat password yang
-   kuat dan jangan menyimpannya di website atau membagikannya ke publik:
+4. Atur **Project Settings → Script Properties** berikut. Gunakan username dan
+   password sesuai pilihan; tidak ada batas minimal panjang. Jangan menyimpan
+   kredensial di website atau membagikannya ke publik:
    - `ADMIN_USERNAME` — username administrator.
-   - `ADMIN_PASSWORD` — password administrator, minimal 12 karakter.
+   - `ADMIN_PASSWORD` — password administrator.
 5. Di Google Sheets, admin juga boleh menambahkan pengumuman langsung: satu
    baris per pengumuman; isi kolom `Waktu`, `Pengumuman`, dan `Admin`. Batasi
    akses editor spreadsheet hanya untuk administrator tepercaya; jangan

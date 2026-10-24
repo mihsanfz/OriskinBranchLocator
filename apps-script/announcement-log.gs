@@ -37,8 +37,8 @@ function loginAdmin(username, password) {
   const properties = PropertiesService.getScriptProperties();
   const adminUsername = properties.getProperty("ADMIN_USERNAME");
   const adminPassword = properties.getProperty("ADMIN_PASSWORD");
-  if (!adminUsername || !adminPassword || adminPassword.length < 12) {
-    throw new Error("Atur ADMIN_USERNAME dan password kuat ADMIN_PASSWORD (minimal 12 karakter) di Script Properties.");
+  if (!adminUsername || !adminPassword) {
+    throw new Error("Atur ADMIN_USERNAME dan ADMIN_PASSWORD di Script Properties.");
   }
 
   const cache = CacheService.getScriptCache();
