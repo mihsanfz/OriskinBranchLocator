@@ -97,11 +97,14 @@ tersebut tidak langsung mengubah data klinik dan harus ditinjau administrator.
    `apps-script/admin.html` ke dalamnya. Tambahkan file HTML bernama `request`
    dan salin isi `apps-script/request.html` ke dalamnya.
 3. Pilih fungsi `setupAnnouncementLog`, klik **Run**, dan setujui izin. Fungsi
-   ini membuat sheet `Log Perubahan` dan `Pengajuan Perubahan`, serta menyimpan
-   ID spreadsheet untuk dipakai aplikasi. Sheet pengajuan memiliki kolom
-   `Waktu Pengajuan`, `Nama Pengaju`, `Kontak`, `Klinik`, `Rincian Perubahan`,
-   dan `Status` (awal `Menunggu`). Jalankan fungsi lagi jika sheet pengajuan
-   belum dibuat; pengajuan yang sudah ada tidak dihapus.
+   ini membuat sheet `Log Perubahan`, `Pengajuan Perubahan`, dan
+   `Log Login Administrator`, serta menyimpan ID spreadsheet untuk dipakai
+   aplikasi. Sheet pengajuan memiliki kolom `Waktu Pengajuan`, `Nama Pengaju`,
+   `Kontak`, `Klinik`, `Rincian Perubahan`, dan `Status` (awal `Menunggu`).
+   Sheet log login mencatat waktu, username yang dicoba, dan hasil login
+   (`Berhasil`, `Gagal`, atau `Diblokir`); password tidak pernah disimpan.
+   Jalankan fungsi lagi jika salah satu sheet belum dibuat; data yang sudah
+   ada tidak dihapus.
 4. Atur **Project Settings → Script Properties** berikut. Gunakan username dan
    password sesuai pilihan; tidak ada batas minimal panjang. Jangan menyimpan
    kredensial di website atau membagikannya ke publik:
@@ -127,6 +130,8 @@ tersebut tidak langsung mengubah data klinik dan harus ditinjau administrator.
 4. Di Google Sheets, publikasikan tab `Log Perubahan` sebagai CSV.
 5. Isi `logGid` dengan gid tab log dan `adminWebAppUrl` dengan URL Web App di
    `clinics.js`.
+   Jangan publikasikan sheet `Log Login Administrator`; batasi aksesnya untuk
+   administrator tepercaya.
 
 Tombol **Log Perubahan** menampilkan hingga 100 pengumuman terbaru. Tombol
 **Ajukan Perubahan** membuka formulir publik. Pengaju mengisi nama, nama klinik,
@@ -136,7 +141,9 @@ per pengguna sementara setiap jam. Pengajuan tidak otomatis mengubah daftar
 klinik; administrator dapat meninjau dan memperbarui statusnya di spreadsheet.
 Tombol **Login Administrator** membuka form login; pengumuman disimpan bersama
 nama admin ke sheet. Form membatasi pengumuman hingga 1000 karakter dan
-membatasi percobaan login. Pastikan sheet log hanya memuat pengumuman yang
+membatasi percobaan login. Semua percobaan login dicatat di sheet internal
+`Log Login Administrator`; jangan publikasikan sheet ini karena memuat
+username yang dicoba. Pastikan sheet log hanya memuat pengumuman yang
 memang boleh dilihat publik.
 
 ## Placeholder logo

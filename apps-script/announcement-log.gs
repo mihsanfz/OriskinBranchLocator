@@ -1,5 +1,7 @@
 const ANNOUNCEMENT_LOG_SHEET_NAME = "Log Perubahan";
 const ANNOUNCEMENT_LOG_HEADERS = ["Waktu", "Pengumuman", "Admin"];
+const ADMIN_LOGIN_LOG_SHEET_NAME = "Log Login Administrator";
+const ADMIN_LOGIN_LOG_HEADERS = ["Waktu", "Username Dicoba", "Hasil"];
 const ADMIN_SESSION_TTL_SECONDS = 3600;
 const ADMIN_MAX_ANNOUNCEMENT_LENGTH = 1000;
 const CHANGE_REQUEST_SHEET_NAME = "Pengajuan Perubahan";
@@ -39,9 +41,41 @@ function setupAnnouncementLog() {
     .getRange(1, 1, 1, CHANGE_REQUEST_HEADERS.length)
     .setValues([CHANGE_REQUEST_HEADERS]);
   requestSheet.setFrozenRows(1);
+  let loginSheet = spreadsheet.getSheetByName(ADMIN_LOGIN_LOG_SHEET_NAME);
+  if (!loginSheet) loginSheet = spreadsheet.insertSheet(ADMIN_LOGIN_LOG_SHEET_NAME);
+  loginSheet
+    .getRange(1, 1, 1, ADMIN_LOGIN_LOG_HEADERS.length)
+    .setValues([ADMIN_LOGIN_LOG_HEADERS]);
+  loginSheet.setFrozenRows(1);
   SpreadsheetApp.getUi().alert(
-    `Sheet "${ANNOUNCEMENT_LOG_SHEET_NAME}" dan "${CHANGE_REQUEST_SHEET_NAME}" siap.\nCatat gid ${sheet.getSheetId()} di clinics.js sebagai logGid.`,
+    `Sheet "${ANNOUNCEMENT_LOG_SHEET_NAME}", "${CHANGE_REQUEST_SHEET_NAME}", dan "${ADMIN_LOGIN_LOG_SHEET_NAME}" siap.\nCatat gid ${sheet.getSheetId()} di clinics.js sebagai logGid.`,
   );
+}
+
+function recordAdminLoginAttempt(username, result) {
+  const spreadsheetId = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
+  if (!spreadsheetId) {
+    throw new Error("Jalankan setupAnnouncementLog() untuk menyiapkan sheet log login.");
+  }
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = spreadsheet.getSheetByName(ADMIN_LOGIN_LOG_SHEET_NAME);
+  if (!sheet) {
+    throw new Error(`Sheet "${ADMIN_LOGIN_LOG_SHEET_NAME}" belum dibuat. Jalankan setupAnnouncementLog().`);
+  }
+
+  const attemptedUsername = String(username || "").trim().slice(0, 100);
+  const safeUsername = /^[=+\-@]/.test(attemptedUsername)
+    ? `'${attemptedUsername}`
+    : attemptedUsername;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    sheet
+      .getRange(sheet.getLastRow() + 1, 1, 1, ADMIN_LOGIN_LOG_HEADERS.length)
+      .setValues([[new Date(), safeUsername, result]]);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function doGet(event) {
@@ -121,13 +155,16 @@ function loginAdmin(username, password) {
   const attemptKey = `admin-login-attempts:${Session.getTemporaryActiveUserKey()}`;
   const attempts = Number(cache.get(attemptKey) || "0");
   if (attempts >= 5) {
+    recordAdminLoginAttempt(username, "Diblokir - terlalu banyak percobaan");
     throw new Error("Terlalu banyak percobaan login. Coba lagi setelah 15 menit.");
   }
   if (username !== adminUsername || password !== adminPassword) {
     cache.put(attemptKey, String(attempts + 1), 900);
+    recordAdminLoginAttempt(username, "Gagal");
     throw new Error("Username atau password salah.");
   }
 
+  recordAdminLoginAttempt(username, "Berhasil");
   cache.remove(attemptKey);
   const token = `${Utilities.getUuid()}${Utilities.getUuid()}`;
   cache.put(`admin-session:${token}`, adminUsername, ADMIN_SESSION_TTL_SECONDS);
