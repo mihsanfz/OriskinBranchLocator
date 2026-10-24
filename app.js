@@ -20,7 +20,6 @@
   let routeOrigin = null;
   let routeLine = null;
   let routeRequestController = null;
-  let activeRouteMarker = null;
   let routeRequestSequence = 0;
   let radiusMode = false;
   let allowNearestFallback = false;
@@ -298,7 +297,6 @@
       routeRequestController.abort();
       routeRequestController = null;
     }
-    activeRouteMarker = null;
     if (routeLine) {
       routeLine.remove();
       routeLine = null;
@@ -312,6 +310,13 @@
         <span class="clinic-route-status">${getStatusLabel(clinic.status)}</span>
         <p>${message}</p>
       </div>`;
+  }
+
+  function openClinicPopup(clinic, message) {
+    L.popup({ offset: [0, -12] })
+      .setLatLng(clinic.coordinates)
+      .setContent(getRoutePopupContent(clinic, message))
+      .openOn(map);
   }
 
   function animateRoute(line) {
@@ -343,25 +348,20 @@
     return url.toString();
   }
 
-  async function showClinicRoute(clinic, marker) {
+  async function showClinicRoute(clinic) {
     clearRoute();
     const requestSequence = routeRequestSequence;
+    map.closePopup();
     if (!routeOrigin) {
-      marker.setPopupContent(
-        getRoutePopupContent(
-          clinic,
-          "Cari lokasi terlebih dahulu untuk melihat estimasi jarak dan waktu tempuh.",
-        ),
+      openClinicPopup(
+        clinic,
+        "Cari lokasi terlebih dahulu untuk melihat estimasi jarak dan waktu tempuh.",
       );
       return;
     }
 
-    marker.setPopupContent(
-      getRoutePopupContent(clinic, "Menghitung estimasi rute..."),
-    );
     const controller = new AbortController();
     routeRequestController = controller;
-    activeRouteMarker = marker;
     const routeUrl = new URL(
       `https://routing.openstreetmap.de/routed-car/route/v1/driving/${routeOrigin.coordinates[1]},${routeOrigin.coordinates[0]};${clinic.coordinates[1]},${clinic.coordinates[0]}`,
     );
@@ -384,14 +384,14 @@
       ) {
         throw new Error("rute jalan tidak ditemukan");
       }
-      if (requestSequence !== routeRequestSequence || !marker.isPopupOpen()) return;
+      if (requestSequence !== routeRequestSequence) return;
 
       const routeCoordinates = route.geometry.coordinates.map(([longitude, latitude]) => [
         latitude,
         longitude,
       ]);
       routeLine = L.polyline(routeCoordinates, {
-        color: "#f26165",
+        color: "#2563eb",
         weight: 5,
         opacity: 0.9,
         lineCap: "round",
@@ -404,29 +404,24 @@
       });
       const displayedRoute = routeLine;
       await animateRoute(displayedRoute);
-      if (requestSequence !== routeRequestSequence || !marker.isPopupOpen()) return;
+      if (requestSequence !== routeRequestSequence) return;
 
-      marker.setPopupContent(
-        getRoutePopupContent(
-          clinic,
-          `<span class="clinic-route-metric">${formatRouteDistance(route.distance)}</span> jarak tempuh<br><span class="clinic-route-metric">~${formatRouteDuration(route.duration)}</span> estimasi berkendara`,
-        ),
+      openClinicPopup(
+        clinic,
+        `<span class="clinic-route-metric">${formatRouteDistance(route.distance)}</span> jarak tempuh<br><span class="clinic-route-metric">~${formatRouteDuration(route.duration)}</span> estimasi berkendara`,
       );
     } catch (error) {
       if (error.name === "AbortError" || requestSequence !== routeRequestSequence) return;
       console.error("Rute klinik gagal dimuat:", error);
-      marker.setPopupContent(
-        getRoutePopupContent(
-          clinic,
-          `Estimasi rute tidak tersedia saat ini. <a href="${escapeHtml(
-            getGoogleDirectionsUrl(routeOrigin.coordinates, clinic.coordinates),
-          )}" target="_blank" rel="noopener noreferrer">Buka petunjuk arah di Google Maps</a>.`,
-        ),
+      openClinicPopup(
+        clinic,
+        `Estimasi rute tidak tersedia saat ini. <a href="${escapeHtml(
+          getGoogleDirectionsUrl(routeOrigin.coordinates, clinic.coordinates),
+        )}" target="_blank" rel="noopener noreferrer">Buka petunjuk arah di Google Maps</a>.`,
       );
     } finally {
       if (requestSequence === routeRequestSequence) {
         routeRequestController = null;
-        activeRouteMarker = null;
       }
     }
   }
@@ -445,15 +440,8 @@
       iconSize: [34, 34],
       iconAnchor: [17, 17],
     });
-    const marker = L.marker(clinic.coordinates, { icon: markerIcon }).bindPopup(
-      getRoutePopupContent(clinic, "Klik untuk melihat estimasi rute."),
-    );
-    marker.on("popupopen", () => showClinicRoute(clinic, marker));
-    marker.on("popupclose", () => {
-      if (activeRouteMarker === marker && routeRequestController) {
-        clearRoute();
-      }
-    });
+    const marker = L.marker(clinic.coordinates, { icon: markerIcon });
+    marker.on("click", () => showClinicRoute(clinic));
     return marker;
   }
 
@@ -577,7 +565,7 @@
   function focusClinic(clinic) {
     map.setView(clinic.coordinates, 14, { animate: true });
     const marker = markers.get(clinic.id);
-    if (marker) marker.openPopup();
+    if (marker) showClinicRoute(clinic);
   }
 
   function focusSearchLocation(center, zoom = 12, fitResults = false) {
