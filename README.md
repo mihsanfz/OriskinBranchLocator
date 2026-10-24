@@ -71,6 +71,14 @@ menekan tombol cari (bukan autocomplete), dibatasi maksimal satu permintaan per
 detik pada tab tersebut, dan memerlukan koneksi internet. Hasil peta menggunakan
 data OpenStreetMap; atribusi ditampilkan pada peta.
 
+Klik marker klinik setelah mencari lokasi untuk melihat jarak tempuh dan
+estimasi waktu berkendara serta garis rute yang dianimasikan selama sekitar 0,5
+detik. Rute jalan dan estimasi waktu diambil saat diminta dari layanan routing
+OpenStreetMap publik; waktu adalah estimasi tanpa data lalu lintas langsung. Jika rute tidak
+tersedia, popup menyediakan tautan petunjuk arah Google Maps. Tanpa pencarian
+lokasi, popup meminta pengguna mencari lokasi terlebih dahulu. Alamat lengkap
+tetap tersedia di tombol Google Maps pada kartu klinik.
+
 ## Log pengumuman perubahan
 
 Log berupa kalimat pengumuman yang ditulis manual oleh administrator, bukan

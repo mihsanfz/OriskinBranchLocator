@@ -17,6 +17,11 @@
   const logsStatus = document.querySelector("#logs-status");
   const logsList = document.querySelector("#logs-list");
   let currentCenter = defaultCenter;
+  let routeOrigin = null;
+  let routeLine = null;
+  let routeRequestController = null;
+  let activeRouteMarker = null;
+  let routeRequestSequence = 0;
   let radiusMode = false;
   let allowNearestFallback = false;
   let nearestFallbackMode = false;
@@ -225,6 +230,13 @@
     return `${distance < 10 ? distance.toFixed(1) : Math.round(distance)} km`;
   }
 
+  function formatRouteDistance(meters) {
+    const kilometers = meters / 1000;
+    return kilometers < 1
+      ? `${Math.round(meters)} m`
+      : `${kilometers.toFixed(1)} km`;
+  }
+
   function formatTravelTime(distance) {
     const totalMinutes = Math.max(1, Math.round(distance / 0.8));
     const hours = Math.floor(totalMinutes / 60);
@@ -233,6 +245,16 @@
     if (!hours) return `~${minutes} menit`;
     if (!minutes) return `~${hours} jam`;
     return `~${hours} jam ${minutes} menit`;
+  }
+
+  function formatRouteDuration(seconds) {
+    const totalMinutes = Math.round(seconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (!hours) return `${totalMinutes} menit`;
+    if (!minutes) return `${hours} jam`;
+    return `${hours} jam ${minutes} menit`;
   }
 
   function showToast(message) {
@@ -270,6 +292,145 @@
     }[status];
   }
 
+  function clearRoute() {
+    routeRequestSequence += 1;
+    if (routeRequestController) {
+      routeRequestController.abort();
+      routeRequestController = null;
+    }
+    activeRouteMarker = null;
+    if (routeLine) {
+      routeLine.remove();
+      routeLine = null;
+    }
+  }
+
+  function getRoutePopupContent(clinic, message) {
+    return `
+      <div class="clinic-route-popup">
+        <strong>${escapeHtml(clinic.name)}</strong>
+        <span class="clinic-route-status">${getStatusLabel(clinic.status)}</span>
+        <p>${message}</p>
+      </div>`;
+  }
+
+  function animateRoute(line) {
+    const path = line.getElement();
+    if (!path) return Promise.resolve();
+    const length = path.getTotalLength();
+    if (!length) return Promise.resolve();
+    path.style.transition = "none";
+    path.style.strokeDasharray = `${length}`;
+    path.style.strokeDashoffset = `${length}`;
+    path.getBoundingClientRect();
+    return new Promise((resolve) => {
+      window.requestAnimationFrame(() => {
+        path.style.transition = "stroke-dashoffset 500ms ease-out";
+        path.style.strokeDashoffset = "0";
+        window.setTimeout(resolve, 500);
+      });
+    });
+  }
+
+  function getGoogleDirectionsUrl(origin, destination) {
+    const formatCoordinates = (coordinates) =>
+      `${coordinates[0]},${coordinates[1]}`;
+    const url = new URL("https://www.google.com/maps/dir/");
+    url.searchParams.set("api", "1");
+    url.searchParams.set("origin", formatCoordinates(origin));
+    url.searchParams.set("destination", formatCoordinates(destination));
+    url.searchParams.set("travelmode", "driving");
+    return url.toString();
+  }
+
+  async function showClinicRoute(clinic, marker) {
+    clearRoute();
+    const requestSequence = routeRequestSequence;
+    if (!routeOrigin) {
+      marker.setPopupContent(
+        getRoutePopupContent(
+          clinic,
+          "Cari lokasi terlebih dahulu untuk melihat estimasi jarak dan waktu tempuh.",
+        ),
+      );
+      return;
+    }
+
+    marker.setPopupContent(
+      getRoutePopupContent(clinic, "Menghitung estimasi rute..."),
+    );
+    const controller = new AbortController();
+    routeRequestController = controller;
+    activeRouteMarker = marker;
+    const routeUrl = new URL(
+      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${routeOrigin.coordinates[1]},${routeOrigin.coordinates[0]};${clinic.coordinates[1]},${clinic.coordinates[0]}`,
+    );
+    routeUrl.searchParams.set("overview", "full");
+    routeUrl.searchParams.set("geometries", "geojson");
+    routeUrl.searchParams.set("steps", "false");
+
+    try {
+      const response = await fetch(routeUrl, { signal: controller.signal });
+      if (!response.ok) throw new Error(`layanan rute merespons HTTP ${response.status}`);
+      const result = await response.json();
+      const route = result.routes?.[0];
+      if (
+        result.code !== "Ok" ||
+        !route ||
+        !Number.isFinite(route.distance) ||
+        !Number.isFinite(route.duration) ||
+        !Array.isArray(route.geometry?.coordinates) ||
+        route.geometry.coordinates.length < 2
+      ) {
+        throw new Error("rute jalan tidak ditemukan");
+      }
+      if (requestSequence !== routeRequestSequence || !marker.isPopupOpen()) return;
+
+      const routeCoordinates = route.geometry.coordinates.map(([longitude, latitude]) => [
+        latitude,
+        longitude,
+      ]);
+      routeLine = L.polyline(routeCoordinates, {
+        color: "#f26165",
+        weight: 5,
+        opacity: 0.9,
+        lineCap: "round",
+        lineJoin: "round",
+      }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), {
+        padding: [48, 48],
+        maxZoom: 14,
+        animate: false,
+      });
+      const displayedRoute = routeLine;
+      await animateRoute(displayedRoute);
+      if (requestSequence !== routeRequestSequence || !marker.isPopupOpen()) return;
+
+      marker.setPopupContent(
+        getRoutePopupContent(
+          clinic,
+          `<span class="clinic-route-metric">${formatRouteDistance(route.distance)}</span> jarak tempuh<br><span class="clinic-route-metric">~${formatRouteDuration(route.duration)}</span> estimasi berkendara`,
+        ),
+      );
+    } catch (error) {
+      if (error.name === "AbortError" || requestSequence !== routeRequestSequence) return;
+      console.error("Rute klinik gagal dimuat:", error);
+      marker.setPopupContent(
+        getRoutePopupContent(
+          clinic,
+          `Estimasi rute tidak tersedia saat ini. <a href="${escapeHtml(
+            getGoogleDirectionsUrl(routeOrigin.coordinates, clinic.coordinates),
+          )}" target="_blank" rel="noopener noreferrer">Buka petunjuk arah di Google Maps</a>.`,
+        ),
+      );
+    } finally {
+      if (requestSequence === routeRequestSequence) {
+        routeRequestController = null;
+        activeRouteMarker = null;
+      }
+    }
+  }
+
   function populateCityFilter() {
     const cities = [...new Set(clinics.map((clinic) => clinic.city))]
       .sort((first, second) => first.localeCompare(second, "id"));
@@ -284,12 +445,20 @@
       iconSize: [34, 34],
       iconAnchor: [17, 17],
     });
-    return L.marker(clinic.coordinates, { icon: markerIcon }).bindPopup(
-      `<strong>${escapeHtml(clinic.name)}</strong><br>${escapeHtml(clinic.address)}<br><span>${getStatusLabel(clinic.status)}</span>`,
+    const marker = L.marker(clinic.coordinates, { icon: markerIcon }).bindPopup(
+      getRoutePopupContent(clinic, "Klik untuk melihat estimasi rute."),
     );
+    marker.on("popupopen", () => showClinicRoute(clinic, marker));
+    marker.on("popupclose", () => {
+      if (activeRouteMarker === marker && routeRequestController) {
+        clearRoute();
+      }
+    });
+    return marker;
   }
 
   function render() {
+    clearRoute();
     const candidates = clinics
       .map((clinic) => ({
         ...clinic,
@@ -427,7 +596,9 @@
   }
 
   function setLocation(center, label, zoom = 12) {
+    clearRoute();
     currentCenter = center;
+    routeOrigin = null;
     radiusMode = true;
     allowNearestFallback = false;
     if (searchLocationMarker) {
@@ -441,8 +612,10 @@
   }
 
   function showAllLocations() {
+    clearRoute();
     searchSequence += 1;
     radiusMode = false;
+    routeOrigin = null;
     allowNearestFallback = false;
     nearestFallbackMode = false;
     currentCenter = defaultCenter;
@@ -652,12 +825,14 @@
         saveRecent(value);
         searchInput.value = value;
         currentCenter = location.coordinates;
+        routeOrigin = { coordinates: location.coordinates, label: location.label };
         radiusMode = true;
         allowNearestFallback = true;
         document.querySelector("#active-location").textContent = location.label;
         document.querySelector("#result-radius").textContent = "dalam radius 100 km dari";
 
         if (searchLocationMarker) searchLocationMarker.remove();
+        clearRoute();
         searchLocationMarker = L.circleMarker(location.coordinates, {
           radius: 9,
           color: "#fff",
@@ -697,6 +872,7 @@
       searchLocationMarker = null;
     }
     setLocation(matches[0].coordinates, value, 12);
+    routeOrigin = { coordinates: matches[0].coordinates, label: value };
     showToast(`Lokasi "${value}" ditemukan. Menampilkan klinik dalam radius 100 km.`);
   }
 

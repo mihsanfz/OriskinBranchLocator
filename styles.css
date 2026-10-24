@@ -631,6 +631,38 @@ h1 {
   font-size: 9px !important;
 }
 
+.clinic-route-popup {
+  min-width: 190px;
+  line-height: 1.5;
+}
+
+.clinic-route-popup > strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+.clinic-route-status {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.clinic-route-popup p {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+.clinic-route-metric {
+  color: var(--coral-dark);
+  font-weight: 700;
+}
+
+.clinic-route-popup a {
+  color: var(--coral-dark);
+  font-weight: 700;
+}
+
 .clinic-marker-wrap {
   border: 0;
   background: transparent;
