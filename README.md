@@ -2,7 +2,8 @@
 
 Locator klinik responsif dengan peta interaktif OpenStreetMap, pencarian cabang,
 hasil yang diurutkan berdasarkan jarak, tombol lokasi perangkat, petunjuk Google
-Maps, WhatsApp, salin alamat, berbagi tautan, dan pilihan tema.
+Maps, WhatsApp, salin alamat, filter kota, log perubahan bersama, berbagi tautan,
+dan pilihan tema.
 
 ## Menjalankan
 
@@ -55,3 +56,56 @@ Tombol Google Maps menggunakan link pada kolom `google_maps` jika diisi; jika
 kosong, locator mencari berdasarkan nama klinik, alamat, dan kota, bukan
 koordinat. Status tampil pada kartu dan marker peta; klinik dengan status apa
 pun tetap ditampilkan dan bisa diklik.
+
+Saat tidak mencari, peta dan daftar menampilkan semua klinik. Pencarian atau
+fitur lokasi menampilkan klinik dalam radius 100 km. Filter **Semua kota**
+memilih kota dari nilai pada kolom `city`.
+
+## Log pengumuman perubahan
+
+Log berupa kalimat pengumuman yang ditulis manual oleh administrator, bukan
+rekaman otomatis setiap edit sel. Contoh: `Klinik Kartini sudah tidak beroperasi
+dikarenakan sudah tutup.` Semua pengunjung dapat melihat pengumuman, sedangkan
+penambahan melalui website membutuhkan login administrator.
+
+### Siapkan sheet
+
+1. Buka **Extensions → Apps Script** dari spreadsheet klinik.
+2. Ganti isi file `Code.gs` dengan `apps-script/announcement-log.gs`, lalu
+   tambahkan file HTML bernama `admin` dan salin isi
+   `apps-script/admin.html` ke dalamnya.
+3. Pilih fungsi `setupAnnouncementLog`, klik **Run**, dan setujui izin. Fungsi
+   ini membuat sheet `Log Perubahan` dengan kolom `Waktu`, `Pengumuman`, `Admin`
+   serta menyimpan ID spreadsheet untuk dipakai aplikasi.
+4. Atur **Project Settings → Script Properties** berikut. Buat password yang
+   kuat dan jangan menyimpannya di website atau membagikannya ke publik:
+   - `ADMIN_USERNAME` — username administrator.
+   - `ADMIN_PASSWORD` — password administrator, minimal 12 karakter.
+5. Di Google Sheets, admin juga boleh menambahkan pengumuman langsung: satu
+   baris per pengumuman; isi kolom `Waktu`, `Pengumuman`, dan `Admin`. Batasi
+   akses editor spreadsheet hanya untuk administrator tepercaya; jangan
+   memberikan akses edit publik.
+
+### Aktifkan login di website
+
+1. Di Apps Script pilih **Deploy → New deployment → Web app**.
+2. Pilih **Execute as: Me** agar web app menulis ke spreadsheet pemilik script.
+   Atur akses web app ke **Anyone** supaya pengunjung website dapat membuka
+   halaman login. Halaman bisa dibuka publik, tetapi setiap penambahan tetap
+   memerlukan verifikasi username/password di server.
+3. Deploy dan salin URL Web App yang berakhiran `/exec`.
+4. Di Google Sheets, publikasikan tab `Log Perubahan` sebagai CSV.
+5. Isi `logGid` dengan gid tab log dan `adminWebAppUrl` dengan URL Web App di
+   `clinics.js`.
+
+Tombol **Log Perubahan** menampilkan hingga 100 pengumuman terbaru. Tombol
+**Login administrator** membuka form login; pengumuman disimpan bersama nama
+admin ke sheet. Form membatasi pengumuman hingga 1000 karakter dan membatasi
+percobaan login. Pastikan sheet log hanya memuat pengumuman yang memang boleh
+dilihat publik.
+
+## Placeholder logo
+
+Header memakai dua gambar dengan ukuran tampilan sama: `assets/logo-1.png` dan
+`assets/logo-2.png`. Ganti kedua file itu dengan PNG milikmu (gunakan nama file
+yang sama) untuk memperbarui logo; tidak perlu mengubah kode halaman.

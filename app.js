@@ -10,7 +10,12 @@
   const searchInput = document.querySelector("#search-input");
   const toast = document.querySelector("#toast");
   const dataStatus = document.querySelector("#data-status");
+  const cityFilter = document.querySelector("#city-filter");
+  const logsDialog = document.querySelector("#logs-dialog");
+  const logsStatus = document.querySelector("#logs-status");
+  const logsList = document.querySelector("#logs-list");
   let currentCenter = defaultCenter;
+  let radiusMode = false;
   let visibleClinics = clinics.slice();
   let toastTimer;
 
@@ -245,6 +250,13 @@
     }[status];
   }
 
+  function populateCityFilter() {
+    const cities = [...new Set(clinics.map((clinic) => clinic.city))]
+      .sort((first, second) => first.localeCompare(second, "id"));
+    cityFilter.replaceChildren(new Option("Semua kota", ""));
+    cities.forEach((city) => cityFilter.add(new Option(city, city)));
+  }
+
   function createMarker(clinic, index) {
     const markerIcon = L.divIcon({
       className: "clinic-marker-wrap",
@@ -263,8 +275,13 @@
         ...clinic,
         distance: distanceKm(currentCenter, clinic.coordinates),
       }))
-      .filter((clinic) => clinic.distance <= 100)
-      .sort((first, second) => first.distance - second.distance);
+      .filter((clinic) => !cityFilter.value || clinic.city === cityFilter.value)
+      .filter((clinic) => !radiusMode || clinic.distance <= 100)
+      .sort((first, second) =>
+        radiusMode
+          ? first.distance - second.distance
+          : first.city.localeCompare(second.city, "id") || first.name.localeCompare(second.name, "id"),
+      );
 
     document.querySelector("#result-count").textContent =
       `${visibleClinics.length} cabang`;
@@ -284,18 +301,21 @@
       card.tabIndex = 0;
       card.setAttribute(
         "aria-label",
-        `${clinic.name}, ${getStatusLabel(clinic.status)}, ${formatDistance(clinic.distance)}`,
+        `${clinic.name}, ${getStatusLabel(clinic.status)}${radiusMode ? `, ${formatDistance(clinic.distance)}` : ""}`,
       );
+      const distanceMarkup = radiusMode
+        ? `<div class="distance">${formatDistance(clinic.distance)}<small>~${Math.max(1, Math.round(clinic.distance / 0.8))} menit</small></div>`
+        : "";
       card.innerHTML = `
         <div class="card-heading">
-          <span class="rank-badge ${index === 0 ? "rank-featured" : ""}">${index === 0 ? "★" : index + 1}</span>
+          <span class="rank-badge ${radiusMode && index === 0 ? "rank-featured" : ""}">${radiusMode && index === 0 ? "★" : index + 1}</span>
           <div class="clinic-title">
             <strong>${escapeHtml(clinic.name)}</strong>
-            ${index === 0 ? '<span class="nearest-badge">⭐ Terdekat</span>' : ""}
+            ${radiusMode && index === 0 ? '<span class="nearest-badge">⭐ Terdekat</span>' : ""}
             <span class="status-badge status-${clinic.status}">${getStatusLabel(clinic.status)}</span>
             <span>${escapeHtml(clinic.city)}</span>
           </div>
-          <div class="distance">${formatDistance(clinic.distance)}<small>~${Math.max(1, Math.round(clinic.distance / 0.8))} menit</small></div>
+          ${distanceMarkup}
         </div>
         <p class="clinic-detail"><span aria-hidden="true">♧</span>${escapeHtml(clinic.address)}</p>
         <p class="clinic-detail"><span aria-hidden="true">◷</span>${escapeHtml(clinic.hours || "Jam operasional belum tersedia")}</p>
@@ -341,7 +361,9 @@
 
     if (!visibleClinics.length) {
       clinicList.innerHTML =
-        '<div class="empty-results">Belum ada klinik dalam radius 100 km. Coba cari lokasi lain.</div>';
+        `<div class="empty-results">${radiusMode ? "Belum ada klinik dalam radius 100 km. Coba cari lokasi lain." : "Tidak ada klinik untuk filter kota ini."}</div>`;
+    } else if (!radiusMode) {
+      map.fitBounds(markerLayer.getBounds(), { padding: [32, 32], maxZoom: 6 });
     }
   }
 
@@ -353,10 +375,92 @@
 
   function setLocation(center, label, zoom = 12) {
     currentCenter = center;
+    radiusMode = true;
     document.querySelector("#active-location").textContent = label;
     document.querySelector("#result-radius").textContent = "dalam radius 100 km dari";
     map.setView(center, zoom, { animate: true });
     render();
+  }
+
+  function showAllLocations() {
+    radiusMode = false;
+    currentCenter = defaultCenter;
+    searchInput.value = "";
+    document.querySelector("#active-location").textContent = "Seluruh lokasi";
+    document.querySelector("#result-radius").textContent = "di seluruh lokasi";
+    render();
+  }
+
+  function renderLogs(rows) {
+    logsList.replaceChildren();
+    const headers = rows[0].map((header) => normalize(header).replace(/[^a-z0-9]/g, ""));
+    const column = (...names) => headers.findIndex((header) => names.includes(header));
+    const columns = {
+      timestamp: column("timestamp", "waktu", "tanggal"),
+      announcement: column("announcement", "pengumuman", "pesan", "log"),
+      admin: column("admin", "author", "penulis", "administrator"),
+    };
+    if (columns.announcement === -1) {
+      throw new Error('Kolom "Pengumuman" tidak ditemukan di tab log.');
+    }
+
+    const entries = rows
+      .slice(1)
+      .filter((values) => values[columns.announcement]?.trim())
+      .reverse()
+      .slice(0, 100);
+    entries.forEach((values) => {
+      const entry = document.createElement("article");
+      entry.className = "announcement-entry";
+      const message = document.createElement("p");
+      message.className = "announcement-text";
+      message.textContent = values[columns.announcement];
+      entry.append(message);
+
+      const metadata = [
+        columns.timestamp === -1 ? "" : values[columns.timestamp] || "",
+        columns.admin === -1 ? "" : values[columns.admin] || "",
+      ].filter(Boolean);
+      if (metadata.length) {
+        const meta = document.createElement("small");
+        meta.className = "announcement-meta";
+        meta.textContent = metadata.join(" · ");
+        entry.append(meta);
+      }
+      logsList.append(entry);
+    });
+    logsStatus.textContent = entries.length
+      ? `Menampilkan ${entries.length} pengumuman terbaru.`
+      : "Belum ada pengumuman.";
+  }
+
+  async function loadLogs() {
+    const { spreadsheetId, logGid } = window.ORISKIN_SHEET || {};
+    logsList.replaceChildren();
+    if (!logGid) {
+      logsStatus.textContent =
+        "Tab pengumuman belum dikonfigurasi. Buat sheet Log Perubahan dengan kolom Waktu, Pengumuman, dan Admin, lalu isi logGid di clinics.js.";
+      return;
+    }
+
+    logsStatus.textContent = "Memuat pengumuman...";
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/export?format=csv&gid=${encodeURIComponent(logGid)}`;
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(
+          response.status === 401 || response.status === 403
+            ? "Tab Log Perubahan belum dipublikasikan atau belum dapat dibaca."
+            : `Pengumuman gagal dimuat (HTTP ${response.status}).`,
+        );
+      }
+      renderLogs(parseCsv(await response.text()));
+    } catch (error) {
+      logsStatus.textContent =
+        error instanceof TypeError
+          ? "Tidak dapat mengakses tab pengumuman. Pastikan tab dipublikasikan sebagai CSV dan periksa koneksi."
+          : error.message;
+    }
   }
 
   function getRecents() {
@@ -425,6 +529,30 @@
   document.querySelector("#search-form").addEventListener("submit", (event) => {
     event.preventDefault();
     searchLocation(searchInput.value);
+  });
+
+  searchInput.addEventListener("input", () => {
+    if (!searchInput.value.trim() && radiusMode) showAllLocations();
+  });
+
+  cityFilter.addEventListener("change", render);
+
+  document.querySelector("#logs-button").addEventListener("click", () => {
+    logsDialog.showModal();
+    loadLogs();
+  });
+  document.querySelector("#logs-close").addEventListener("click", () => logsDialog.close());
+  document.querySelector("#admin-login-button").addEventListener("click", () => {
+    const { adminWebAppUrl } = window.ORISKIN_SHEET || {};
+    if (!adminWebAppUrl) {
+      logsStatus.textContent =
+        "Halaman administrator belum dikonfigurasi. Isi adminWebAppUrl di clinics.js setelah Apps Script Web App di-deploy.";
+      return;
+    }
+    window.open(adminWebAppUrl, "_blank", "noopener,noreferrer");
+  });
+  logsDialog.addEventListener("click", (event) => {
+    if (event.target === logsDialog) logsDialog.close();
   });
 
   document.querySelector("#locate-button").addEventListener("click", () => {
@@ -498,8 +626,9 @@
   loadClinics()
     .then(() => {
       document.querySelector("#clinic-total").textContent = clinics.length;
+      populateCityFilter();
       dataStatus.textContent = "";
-      render();
+      showAllLocations();
     })
     .catch((error) => {
       const message =

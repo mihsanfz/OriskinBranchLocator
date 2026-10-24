@@ -29,15 +29,15 @@
   <body>
     <header class="topbar">
       <a class="brand" href="#" aria-label="Oriskin Branch Locator">
-        <span class="brand-mark" aria-hidden="true">◖</span>
-        <span class="brand-copy">
-          <strong>Oriskin</strong>
-          <small>BRANCH LOCATOR</small>
+        <span class="brand-logos">
+          <img src="assets/logo-1.png" alt="Logo 1 — placeholder" />
+          <img src="assets/logo-2.png" alt="Logo 2 — placeholder" />
         </span>
       </a>
       <span class="clinic-total"><span aria-hidden="true">●</span> <b id="clinic-total">0</b> Klinik</span>
       <div class="topbar-actions">
         <a href="mailto:customercare@oriskin.co.id">Customer Service Tool</a>
+        <button id="logs-button" class="topbar-link-button" type="button">Log Perubahan</button>
         <span class="topbar-divider"></span>
         <button id="theme-toggle" class="icon-button" type="button" aria-label="Aktifkan mode gelap" title="Ganti tema">☾</button>
       </div>
@@ -70,10 +70,16 @@
         <section class="results-panel">
           <div class="results-toolbar">
             <div>
-              <div class="result-count"><strong id="result-count">0 cabang</strong><span id="result-radius">dalam radius 100 km dari</span></div>
-              <p class="active-location"><span aria-hidden="true">♧</span> <span id="active-location">Indonesia</span></p>
+              <div class="result-count"><strong id="result-count">0 cabang</strong><span id="result-radius">di seluruh lokasi</span></div>
+              <p class="active-location"><span aria-hidden="true">♧</span> <span id="active-location">Seluruh lokasi</span></p>
             </div>
-            <button id="share-button" class="share-button" type="button"><span aria-hidden="true">♧</span> Bagikan</button>
+            <div class="results-actions">
+              <label class="visually-hidden" for="city-filter">Filter berdasarkan kota</label>
+              <select id="city-filter" class="city-filter" aria-label="Filter berdasarkan kota">
+                <option value="">Semua kota</option>
+              </select>
+              <button id="share-button" class="share-button" type="button"><span aria-hidden="true">♧</span> Bagikan</button>
+            </div>
           </div>
           <div id="data-status" class="empty-results" role="status" aria-live="polite">
             Memuat data klinik...
@@ -88,5 +94,21 @@
         <div id="toast" class="toast" role="status" aria-live="polite"></div>
       </section>
     </main>
+
+    <dialog id="logs-dialog" class="logs-dialog" aria-labelledby="logs-title">
+      <div class="logs-header">
+        <div>
+          <h2 id="logs-title">Log Perubahan Klinik</h2>
+          <p>Pengumuman tentang perubahan klinik yang tercatat di spreadsheet.</p>
+        </div>
+        <button id="logs-close" class="icon-button" type="button" aria-label="Tutup log perubahan">×</button>
+      </div>
+      <div id="logs-status" class="logs-status" role="status" aria-live="polite"></div>
+      <div class="logs-admin-actions">
+        <p>Administrator dapat menulis pengumuman di spreadsheet atau masuk untuk menambahkannya.</p>
+        <button id="admin-login-button" class="share-button" type="button">Login administrator</button>
+      </div>
+      <div id="logs-list" class="announcement-list"></div>
+    </dialog>
   </body>
 </html>

@@ -1,0 +1,190 @@
+<!doctype html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, sans-serif;
+        color: #28242a;
+        background: #fff7f6;
+      }
+
+      body {
+        margin: 0;
+        padding: 28px 16px;
+      }
+
+      main {
+        width: min(100%, 560px);
+        margin: 0 auto;
+        padding: 24px;
+        border: 1px solid #f0e5e3;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 12px 40px #42201b0d;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+      }
+
+      p {
+        color: #806d6b;
+        line-height: 1.5;
+      }
+
+      label {
+        display: block;
+        margin: 16px 0 6px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        padding: 11px 12px;
+        border: 1px solid #e8d9d7;
+        border-radius: 10px;
+        box-sizing: border-box;
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 130px;
+        resize: vertical;
+      }
+
+      button {
+        min-height: 42px;
+        margin-top: 16px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 22px;
+        color: #fff;
+        background: #f26165;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: .65;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      #status {
+        min-height: 20px;
+        margin-top: 14px;
+        font-size: 13px;
+      }
+
+      #status.error {
+        color: #b4232d;
+      }
+
+      #status.success {
+        color: #087a54;
+      }
+
+      .counter {
+        margin: 6px 0 0;
+        font-size: 12px;
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Log Perubahan Klinik</h1>
+      <p>Masuk sebagai administrator untuk menambahkan pengumuman yang akan terlihat di locator.</p>
+
+      <form id="login-form">
+        <label for="username">Username administrator</label>
+        <input id="username" name="username" autocomplete="username" required />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <button type="submit">Login administrator</button>
+      </form>
+
+      <section id="announcement-section" hidden>
+        <p id="signed-in-as"></p>
+        <form id="announcement-form">
+          <label for="announcement">Teks pengumuman</label>
+          <textarea id="announcement" maxlength="1000" placeholder="Contoh: Klinik Kartini sudah tidak beroperasi dikarenakan sudah tutup." required></textarea>
+          <p class="counter"><span id="character-count">0</span>/1000 karakter</p>
+          <button type="submit">Tambahkan pengumuman</button>
+        </form>
+      </section>
+
+      <div id="status" role="status" aria-live="polite"></div>
+    </main>
+    <script>
+      const loginForm = document.querySelector("#login-form");
+      const announcementForm = document.querySelector("#announcement-form");
+      const announcementInput = document.querySelector("#announcement");
+      const status = document.querySelector("#status");
+      let adminToken = "";
+
+      function setStatus(message, type) {
+        status.textContent = message;
+        status.className = type || "";
+      }
+
+      loginForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const button = loginForm.querySelector("button");
+        button.disabled = true;
+        setStatus("Memeriksa login...", "");
+        google.script.run
+          .withSuccessHandler((result) => {
+            button.disabled = false;
+            adminToken = result.token;
+            loginForm.hidden = true;
+            document.querySelector("#password").value = "";
+            document.querySelector("#announcement-section").hidden = false;
+            document.querySelector("#signed-in-as").textContent = `Login sebagai ${result.username}.`;
+            setStatus("Login berhasil.", "success");
+          })
+          .withFailureHandler((error) => {
+            button.disabled = false;
+            setStatus(error.message, "error");
+          })
+          .loginAdmin(
+            document.querySelector("#username").value,
+            document.querySelector("#password").value,
+          );
+      });
+
+      announcementInput.addEventListener("input", () => {
+        document.querySelector("#character-count").textContent = announcementInput.value.length;
+      });
+
+      announcementForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const button = announcementForm.querySelector("button");
+        button.disabled = true;
+        setStatus("Menyimpan pengumuman...", "");
+        google.script.run
+          .withSuccessHandler(() => {
+            button.disabled = false;
+            announcementForm.reset();
+            document.querySelector("#character-count").textContent = "0";
+            setStatus("Pengumuman berhasil disimpan ke spreadsheet.", "success");
+          })
+          .withFailureHandler((error) => {
+            button.disabled = false;
+            setStatus(error.message, "error");
+          })
+          .addAnnouncement(adminToken, announcementInput.value);
+      });
+    </script>
+  </body>
+</html>
