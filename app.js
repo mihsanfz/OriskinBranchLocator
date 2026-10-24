@@ -6,8 +6,10 @@
   const map = L.map("map", { zoomControl: false }).setView([-2.5, 118], 5);
   const markers = new Map();
   const markerLayer = L.featureGroup().addTo(map);
+  let searchLocationMarker = null;
   const clinicList = document.querySelector("#clinic-list");
   const searchInput = document.querySelector("#search-input");
+  const searchButton = document.querySelector('#search-form button[type="submit"]');
   const toast = document.querySelector("#toast");
   const dataStatus = document.querySelector("#data-status");
   const cityFilter = document.querySelector("#city-filter");
@@ -16,6 +18,11 @@
   const logsList = document.querySelector("#logs-list");
   let currentCenter = defaultCenter;
   let radiusMode = false;
+  let allowNearestFallback = false;
+  let nearestFallbackMode = false;
+  let searchSequence = 0;
+  let lastGeocodeAt = 0;
+  const geocodeCache = new Map();
   let visibleClinics = clinics.slice();
   let toastTimer;
 
@@ -270,18 +277,31 @@
   }
 
   function render() {
-    visibleClinics = clinics
+    const candidates = clinics
       .map((clinic) => ({
         ...clinic,
         distance: distanceKm(currentCenter, clinic.coordinates),
       }))
-      .filter((clinic) => !cityFilter.value || clinic.city === cityFilter.value)
-      .filter((clinic) => !radiusMode || clinic.distance <= 100)
-      .sort((first, second) =>
-        radiusMode
-          ? first.distance - second.distance
-          : first.city.localeCompare(second.city, "id") || first.name.localeCompare(second.name, "id"),
+      .filter((clinic) => !cityFilter.value || clinic.city === cityFilter.value);
+
+    if (radiusMode) {
+      const withinRadius = candidates.filter((clinic) => clinic.distance <= 100);
+      nearestFallbackMode = allowNearestFallback && withinRadius.length === 0;
+      visibleClinics = (nearestFallbackMode ? candidates : withinRadius)
+        .sort((first, second) => first.distance - second.distance)
+        .slice(0, nearestFallbackMode ? 3 : undefined);
+      document.querySelector("#result-radius").textContent = nearestFallbackMode
+        ? "klinik terdekat · jarak garis lurus"
+        : "dalam radius 100 km dari";
+    } else {
+      nearestFallbackMode = false;
+      visibleClinics = candidates.sort(
+        (first, second) =>
+          first.city.localeCompare(second.city, "id") ||
+          first.name.localeCompare(second.name, "id"),
       );
+      document.querySelector("#result-radius").textContent = "di seluruh lokasi";
+    }
 
     document.querySelector("#result-count").textContent =
       `${visibleClinics.length} cabang`;
@@ -304,7 +324,7 @@
         `${clinic.name}, ${getStatusLabel(clinic.status)}${radiusMode ? `, ${formatDistance(clinic.distance)}` : ""}`,
       );
       const distanceMarkup = radiusMode
-        ? `<div class="distance">${formatDistance(clinic.distance)}<small>~${Math.max(1, Math.round(clinic.distance / 0.8))} menit</small></div>`
+        ? `<div class="distance" title="Jarak garis lurus, bukan rute jalan">${formatDistance(clinic.distance)}<small>~${Math.max(1, Math.round(clinic.distance / 0.8))} menit</small></div>`
         : "";
       card.innerHTML = `
         <div class="card-heading">
@@ -361,7 +381,12 @@
 
     if (!visibleClinics.length) {
       clinicList.innerHTML =
-        `<div class="empty-results">${radiusMode ? "Belum ada klinik dalam radius 100 km. Coba cari lokasi lain." : "Tidak ada klinik untuk filter kota ini."}</div>`;
+        `<div class="empty-results">${radiusMode && cityFilter.value ? "Tidak ada klinik dari kota ini di sekitar lokasi pencarian." : radiusMode ? "Belum ada klinik dalam radius 100 km." : "Tidak ada klinik untuk filter kota ini."}</div>`;
+    } else if (nearestFallbackMode) {
+      map.fitBounds(
+        L.latLngBounds([currentCenter, ...visibleClinics.map((clinic) => clinic.coordinates)]),
+        { padding: [32, 32], maxZoom: 6 },
+      );
     } else if (!radiusMode) {
       map.fitBounds(markerLayer.getBounds(), { padding: [32, 32], maxZoom: 6 });
     }
@@ -373,19 +398,47 @@
     if (marker) marker.openPopup();
   }
 
+  function focusSearchLocation(center, zoom = 12, fitResults = false) {
+    window.requestAnimationFrame(() => {
+      map.stop();
+      map.invalidateSize({ pan: false });
+      if (fitResults && visibleClinics.length) {
+        map.fitBounds(
+          L.latLngBounds([center, ...visibleClinics.map((clinic) => clinic.coordinates)]),
+          { padding: [32, 32], maxZoom: 6 },
+        );
+      } else {
+        map.flyTo(center, zoom, { animate: true, duration: 1.2 });
+      }
+    });
+  }
+
   function setLocation(center, label, zoom = 12) {
     currentCenter = center;
     radiusMode = true;
+    allowNearestFallback = false;
+    if (searchLocationMarker) {
+      searchLocationMarker.remove();
+      searchLocationMarker = null;
+    }
     document.querySelector("#active-location").textContent = label;
     document.querySelector("#result-radius").textContent = "dalam radius 100 km dari";
-    map.setView(center, zoom, { animate: true });
     render();
+    focusSearchLocation(center, zoom);
   }
 
   function showAllLocations() {
+    searchSequence += 1;
     radiusMode = false;
+    allowNearestFallback = false;
+    nearestFallbackMode = false;
     currentCenter = defaultCenter;
     searchInput.value = "";
+    searchButton.disabled = false;
+    if (searchLocationMarker) {
+      searchLocationMarker.remove();
+      searchLocationMarker = null;
+    }
     document.querySelector("#active-location").textContent = "Seluruh lokasi";
     document.querySelector("#result-radius").textContent = "di seluruh lokasi";
     render();
@@ -498,12 +551,69 @@
     renderRecents();
   }
 
-  function searchLocation(query) {
+  async function geocodeLocation(query) {
+    const cacheKey = normalize(query);
+    if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey);
+
+    const delay = Math.max(0, 1100 - (Date.now() - lastGeocodeAt));
+    if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay));
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    lastGeocodeAt = Date.now();
+    try {
+      const url = new URL("https://nominatim.openstreetmap.org/search");
+      url.search = new URLSearchParams({
+        q: query,
+        format: "jsonv2",
+        limit: "1",
+        countrycodes: "id",
+        "accept-language": "id",
+      });
+      const response = await fetch(url, {
+        headers: { "Accept-Language": "id" },
+        signal: controller.signal,
+      });
+      if (response.status === 429) {
+        throw new Error("Layanan pencarian lokasi sedang sibuk. Tunggu sebentar, lalu coba lagi.");
+      }
+      if (!response.ok) {
+        throw new Error(`Pencarian lokasi gagal (HTTP ${response.status}).`);
+      }
+
+      const results = await response.json();
+      const result = results[0];
+      if (!result) return null;
+
+      const location = {
+        coordinates: [Number(result.lat), Number(result.lon)],
+        label: result.name || result.display_name.split(",")[0] || query,
+      };
+      if (location.coordinates.some((coordinate) => !Number.isFinite(coordinate))) {
+        throw new Error("Koordinat lokasi pencarian tidak valid.");
+      }
+      geocodeCache.set(cacheKey, location);
+      return location;
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw new Error("Pencarian lokasi melewati batas waktu. Silakan coba lagi.");
+      }
+      if (error instanceof TypeError) {
+        throw new Error("Tidak dapat mengakses pencarian lokasi. Periksa koneksi internet.");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  async function searchLocation(query) {
     const value = query.trim();
     if (!value) {
       showToast("Masukkan nama klinik, daerah, mall, atau landmark.");
       return;
     }
+    const requestId = ++searchSequence;
     const target = normalize(value);
     const matches = clinics.filter((clinic) => {
       const searchable = [
@@ -516,12 +626,63 @@
     });
 
     if (!matches.length) {
-      showToast("Lokasi tidak ditemukan di data klinik. Periksa kata kunci di Google Spreadsheet.");
+      searchButton.disabled = true;
+      searchButton.textContent = "...";
+      try {
+        const location = await geocodeLocation(value);
+        if (requestId !== searchSequence) return;
+        if (!location) {
+          showToast(`Lokasi "${value}" tidak ditemukan. Coba nama kota atau daerah lain.`);
+          return;
+        }
+
+        saveRecent(value);
+        searchInput.value = value;
+        currentCenter = location.coordinates;
+        radiusMode = true;
+        allowNearestFallback = true;
+        document.querySelector("#active-location").textContent = location.label;
+        document.querySelector("#result-radius").textContent = "dalam radius 100 km dari";
+
+        if (searchLocationMarker) searchLocationMarker.remove();
+        searchLocationMarker = L.circleMarker(location.coordinates, {
+          radius: 9,
+          color: "#fff",
+          weight: 3,
+          fillColor: "#6f59c9",
+          fillOpacity: 1,
+        })
+          .bindPopup(`<strong>Lokasi pencarian</strong><br>${escapeHtml(location.label)}`)
+          .addTo(map);
+
+        render();
+        focusSearchLocation(
+          location.coordinates,
+          12,
+          nearestFallbackMode && visibleClinics.length > 0,
+        );
+        showToast(
+          nearestFallbackMode
+            ? `Tidak ada klinik dalam 100 km. Menampilkan klinik terdekat dari ${location.label}.`
+            : `Menampilkan klinik dalam radius 100 km dari ${location.label}.`,
+        );
+      } catch (error) {
+        if (requestId === searchSequence) showToast(error.message);
+      } finally {
+        if (requestId === searchSequence) {
+          searchButton.disabled = false;
+          searchButton.textContent = "⌕";
+        }
+      }
       return;
     }
 
     saveRecent(value);
     searchInput.value = value;
+    if (searchLocationMarker) {
+      searchLocationMarker.remove();
+      searchLocationMarker = null;
+    }
     setLocation(matches[0].coordinates, value, 12);
     showToast(`Lokasi "${value}" ditemukan. Menampilkan klinik dalam radius 100 km.`);
   }
@@ -533,6 +694,11 @@
 
   searchInput.addEventListener("input", () => {
     if (!searchInput.value.trim() && radiusMode) showAllLocations();
+    else if (searchButton.disabled) {
+      searchSequence += 1;
+      searchButton.disabled = false;
+      searchButton.textContent = "⌕";
+    }
   });
 
   cityFilter.addEventListener("change", render);

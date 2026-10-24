@@ -58,8 +58,18 @@ koordinat. Status tampil pada kartu dan marker peta; klinik dengan status apa
 pun tetap ditampilkan dan bisa diklik.
 
 Saat tidak mencari, peta dan daftar menampilkan semua klinik. Pencarian atau
-fitur lokasi menampilkan klinik dalam radius 100 km. Filter **Semua kota**
-memilih kota dari nilai pada kolom `city`.
+fitur lokasi menampilkan klinik dalam radius 100 km. Jika lokasi hasil pencarian
+tidak memiliki klinik dalam 100 km, locator menampilkan tiga klinik terdekat
+beserta jarak garis lurusnya (bukan jarak rute jalan). Kota yang belum ada dalam
+daftar klinik, seperti Batam, tetap bisa dicari. Nama klinik/kata kunci yang
+cocok dengan data tetap diprioritaskan.
+Filter **Semua kota** memilih kota dari nilai pada kolom `city`.
+
+Pencarian nama tempat menggunakan layanan geocoding Nominatim OpenStreetMap
+hanya setelah tidak ada klinik yang cocok. Permintaan dilakukan saat pengguna
+menekan tombol cari (bukan autocomplete), dibatasi maksimal satu permintaan per
+detik pada tab tersebut, dan memerlukan koneksi internet. Hasil peta menggunakan
+data OpenStreetMap; atribusi ditampilkan pada peta.
 
 ## Log pengumuman perubahan
 
