@@ -2,6 +2,16 @@ const ANNOUNCEMENT_LOG_SHEET_NAME = "Log Perubahan";
 const ANNOUNCEMENT_LOG_HEADERS = ["Waktu", "Pengumuman", "Admin"];
 const ADMIN_LOGIN_LOG_SHEET_NAME = "Log Login Administrator";
 const ADMIN_LOGIN_LOG_HEADERS = ["Waktu", "Username Dicoba", "Hasil"];
+const SEARCH_LOG_SHEET_NAME = "Log Pencarian";
+const SEARCH_LOG_HEADERS = [
+  "Waktu",
+  "Kata Pencarian",
+  "Jenis Pencarian",
+  "Jumlah Hasil",
+  "Status",
+];
+const SEARCH_LOG_LIMIT = 120;
+const SEARCH_LOG_WINDOW_SECONDS = 3600;
 const ADMIN_SESSION_TTL_SECONDS = 3600;
 const ADMIN_MAX_ANNOUNCEMENT_LENGTH = 1000;
 const CHANGE_REQUEST_SHEET_NAME = "Pengajuan Perubahan";
@@ -47,9 +57,73 @@ function setupAnnouncementLog() {
     .getRange(1, 1, 1, ADMIN_LOGIN_LOG_HEADERS.length)
     .setValues([ADMIN_LOGIN_LOG_HEADERS]);
   loginSheet.setFrozenRows(1);
+  let searchSheet = spreadsheet.getSheetByName(SEARCH_LOG_SHEET_NAME);
+  if (!searchSheet) searchSheet = spreadsheet.insertSheet(SEARCH_LOG_SHEET_NAME);
+  searchSheet
+    .getRange(1, 1, 1, SEARCH_LOG_HEADERS.length)
+    .setValues([SEARCH_LOG_HEADERS]);
+  searchSheet.setFrozenRows(1);
   SpreadsheetApp.getUi().alert(
-    `Sheet "${ANNOUNCEMENT_LOG_SHEET_NAME}", "${CHANGE_REQUEST_SHEET_NAME}", dan "${ADMIN_LOGIN_LOG_SHEET_NAME}" siap.\nCatat gid ${sheet.getSheetId()} di clinics.js sebagai logGid.`,
+    `Sheet "${ANNOUNCEMENT_LOG_SHEET_NAME}", "${CHANGE_REQUEST_SHEET_NAME}", "${ADMIN_LOGIN_LOG_SHEET_NAME}", dan "${SEARCH_LOG_SHEET_NAME}" siap.\nCatat gid ${sheet.getSheetId()} di clinics.js sebagai logGid.`,
   );
+}
+
+function recordSearchLog(parameters) {
+  const searchTypes = ["Klinik/kata kunci", "Lokasi", "GPS"];
+  const statuses = [
+    "Lokasi ditemukan",
+    "Klinik sekitar ditemukan",
+    "Menampilkan klinik terdekat",
+    "Lokasi tidak ditemukan",
+    "Gagal mencari lokasi",
+    "Lokasi berhasil digunakan",
+    "Izin lokasi ditolak",
+    "Lokasi gagal didapatkan",
+    "Lokasi tidak didukung",
+  ];
+  const query = String(parameters.query || "").trim().slice(0, 200);
+  const type = String(parameters.searchType || "");
+  const result = String(parameters.result || "");
+  const count = Number(parameters.resultCount);
+  if (
+    !query ||
+    !searchTypes.includes(type) ||
+    !statuses.includes(result) ||
+    !Number.isInteger(count) ||
+    count < 0 ||
+    count > 10000
+  ) {
+    throw new Error("Data log pencarian tidak valid.");
+  }
+
+  const spreadsheetId = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
+  if (!spreadsheetId) {
+    throw new Error("Jalankan setupAnnouncementLog() untuk menyiapkan sheet log pencarian.");
+  }
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = spreadsheet.getSheetByName(SEARCH_LOG_SHEET_NAME);
+  if (!sheet) {
+    throw new Error(`Sheet "${SEARCH_LOG_SHEET_NAME}" belum dibuat. Jalankan setupAnnouncementLog().`);
+  }
+
+  const userKey = Session.getTemporaryActiveUserKey() || "anonymous";
+  const attemptKey = `search-log-attempts:${userKey}`;
+  const cache = CacheService.getScriptCache();
+  const safeQuery = /^[=+\-@]/.test(query) ? `'${query}` : query;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const attempts = Number(cache.get(attemptKey) || "0");
+    if (attempts >= SEARCH_LOG_LIMIT) {
+      throw new Error("Batas pencatatan pencarian sementara tercapai.");
+    }
+    sheet
+      .getRange(sheet.getLastRow() + 1, 1, 1, SEARCH_LOG_HEADERS.length)
+      .setValues([[new Date(), safeQuery, type, count, result]]);
+    cache.put(attemptKey, String(attempts + 1), SEARCH_LOG_WINDOW_SECONDS);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function recordAdminLoginAttempt(username, result) {
@@ -79,6 +153,10 @@ function recordAdminLoginAttempt(username, result) {
 }
 
 function doGet(event) {
+  if (event && event.parameter && event.parameter.action === "logSearch") {
+    recordSearchLog(event.parameter);
+    return ContentService.createTextOutput("OK").setMimeType(ContentService.MimeType.TEXT);
+  }
   if (event && event.parameter && event.parameter.page === "request") {
     return HtmlService.createHtmlOutputFromFile("request").setTitle(
       "Ajukan Perubahan Klinik",

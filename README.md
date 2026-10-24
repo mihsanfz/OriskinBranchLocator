@@ -97,12 +97,16 @@ tersebut tidak langsung mengubah data klinik dan harus ditinjau administrator.
    `apps-script/admin.html` ke dalamnya. Tambahkan file HTML bernama `request`
    dan salin isi `apps-script/request.html` ke dalamnya.
 3. Pilih fungsi `setupAnnouncementLog`, klik **Run**, dan setujui izin. Fungsi
-   ini membuat sheet `Log Perubahan`, `Pengajuan Perubahan`, dan
-   `Log Login Administrator`, serta menyimpan ID spreadsheet untuk dipakai
-   aplikasi. Sheet pengajuan memiliki kolom `Waktu Pengajuan`, `Nama Pengaju`,
-   `Kontak`, `Klinik`, `Rincian Perubahan`, dan `Status` (awal `Menunggu`).
-   Sheet log login mencatat waktu, username yang dicoba, dan hasil login
-   (`Berhasil`, `Gagal`, atau `Diblokir`); password tidak pernah disimpan.
+   ini membuat sheet `Log Perubahan`, `Pengajuan Perubahan`,
+   `Log Login Administrator`, dan `Log Pencarian`, serta menyimpan ID
+   spreadsheet untuk dipakai aplikasi. Sheet pengajuan memiliki kolom `Waktu
+   Pengajuan`, `Nama Pengaju`, `Kontak`, `Klinik`, `Rincian Perubahan`, dan
+   `Status` (awal `Menunggu`). Sheet log login mencatat waktu, username yang
+   dicoba, dan hasil login (`Berhasil`, `Gagal`, atau `Diblokir`); password
+   tidak pernah disimpan. Sheet log pencarian mencatat waktu, kata pencarian,
+   jenis pencarian, jumlah hasil, dan status. Pencarian GPS hanya mencatat
+   penggunaan GPS, bukan koordinat. Tidak ada IP atau identitas pengunjung
+   yang disimpan.
    Jalankan fungsi lagi jika salah satu sheet belum dibuat; data yang sudah
    ada tidak dihapus.
 4. Atur **Project Settings → Script Properties** berikut. Gunakan username dan
@@ -131,7 +135,8 @@ tersebut tidak langsung mengubah data klinik dan harus ditinjau administrator.
 5. Isi `logGid` dengan gid tab log dan `adminWebAppUrl` dengan URL Web App di
    `clinics.js`.
    Jangan publikasikan sheet `Log Login Administrator`; batasi aksesnya untuk
-   administrator tepercaya.
+   administrator tepercaya. Jangan publikasikan `Log Pencarian` karena berisi
+   kata pencarian pengunjung; batasi aksesnya untuk administrator tepercaya.
 
 Tombol **Log Perubahan** menampilkan hingga 100 pengumuman terbaru. Tombol
 **Ajukan Perubahan** membuka formulir publik. Pengaju mengisi nama, nama klinik,
@@ -145,6 +150,13 @@ membatasi percobaan login. Semua percobaan login dicatat di sheet internal
 `Log Login Administrator`; jangan publikasikan sheet ini karena memuat
 username yang dicoba. Pastikan sheet log hanya memuat pengumuman yang
 memang boleh dilihat publik.
+
+Setiap pencarian yang dikirim dan penggunaan tombol GPS dicatat untuk evaluasi
+layanan di sheet internal `Log Pencarian`. Pengunjung diberi pemberitahuan
+tentang pencatatan ini di dekat kolom pencarian. Log berisi kata yang diketik
+dan ringkasan hasil; sistem tidak mengirim IP, identitas, ataupun koordinat GPS
+presisi. Batas pencatatan untuk mencegah penyalahgunaan adalah 120 per pengguna
+per jam. Jangan publikasikan sheet ini.
 
 ## Placeholder logo
 

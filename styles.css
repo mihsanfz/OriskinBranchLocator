@@ -177,6 +177,13 @@ h1 {
   box-shadow: 0 1px 3px #47312b08;
 }
 
+.search-privacy-note {
+  margin: 7px 4px 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .search-icon {
   color: #a78d89;
   font-size: 25px;

@@ -29,6 +29,7 @@
   const geocodeCache = new Map();
   let visibleClinics = clinics.slice();
   let toastTimer;
+  let searchLogWarningShown = false;
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
@@ -261,6 +262,26 @@
     toast.classList.add("is-visible");
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 2800);
+  }
+
+  function logSearchEvent(query, searchType, resultCount, result) {
+    const { adminWebAppUrl } = window.ORISKIN_SHEET || {};
+    if (!adminWebAppUrl) {
+      if (!searchLogWarningShown) {
+        console.warn("Log pencarian belum dikonfigurasi: adminWebAppUrl tidak tersedia.");
+        searchLogWarningShown = true;
+      }
+      return;
+    }
+
+    const logUrl = new URL(adminWebAppUrl);
+    logUrl.searchParams.set("action", "logSearch");
+    logUrl.searchParams.set("query", query.slice(0, 200));
+    logUrl.searchParams.set("searchType", searchType);
+    logUrl.searchParams.set("resultCount", String(resultCount));
+    logUrl.searchParams.set("result", result);
+    const request = new Image();
+    request.src = logUrl.toString();
   }
 
   function escapeHtml(value) {
@@ -806,6 +827,7 @@
         const location = await geocodeLocation(value);
         if (requestId !== searchSequence) return;
         if (!location) {
+          logSearchEvent(value, "Lokasi", 0, "Lokasi tidak ditemukan");
           showToast(`Lokasi "${value}" tidak ditemukan. Coba nama kota atau daerah lain.`);
           return;
         }
@@ -832,6 +854,12 @@
           .addTo(map);
 
         render();
+        logSearchEvent(
+          value,
+          "Lokasi",
+          visibleClinics.length,
+          nearestFallbackMode ? "Menampilkan klinik terdekat" : "Klinik sekitar ditemukan",
+        );
         focusSearchLocation(
           location.coordinates,
           12,
@@ -843,7 +871,10 @@
             : `Menampilkan klinik dalam radius 100 km dari ${location.label}.`,
         );
       } catch (error) {
-        if (requestId === searchSequence) showToast(error.message);
+        if (requestId === searchSequence) {
+          logSearchEvent(value, "Lokasi", 0, "Gagal mencari lokasi");
+          showToast(error.message);
+        }
       } finally {
         if (requestId === searchSequence) {
           searchButton.disabled = false;
@@ -861,6 +892,7 @@
     }
     setLocation(matches[0].coordinates, value, 12);
     routeOrigin = { coordinates: matches[0].coordinates, label: value };
+    logSearchEvent(value, "Klinik/kata kunci", visibleClinics.length, "Lokasi ditemukan");
     showToast(`Lokasi "${value}" ditemukan. Menampilkan klinik dalam radius 100 km.`);
   }
 
@@ -911,8 +943,9 @@
 
   document.querySelector("#locate-button").addEventListener("click", () => {
     if (!navigator.geolocation) {
-      showToast("Browser ini tidak mendukung fitur lokasi.");
-      return;
+    logSearchEvent("Lokasi Saya", "GPS", 0, "Lokasi tidak didukung");
+    showToast("Browser ini tidak mendukung fitur lokasi.");
+    return;
     }
     const button = document.querySelector("#locate-button");
     button.disabled = true;
@@ -921,6 +954,7 @@
       ({ coords }) => {
         const center = [coords.latitude, coords.longitude];
         setLocation(center, "Lokasi Saya", 12);
+        logSearchEvent("Lokasi Saya", "GPS", visibleClinics.length, "Lokasi berhasil digunakan");
         button.disabled = false;
         button.innerHTML = '<span aria-hidden="true">➤</span> Gunakan Lokasi Saya';
       },
@@ -931,6 +965,14 @@
           error.code === error.PERMISSION_DENIED
             ? "Izin lokasi ditolak. Aktifkan izin lokasi di browser."
             : "Lokasi tidak berhasil didapatkan. Coba lagi.";
+        logSearchEvent(
+          "Lokasi Saya",
+          "GPS",
+          0,
+          error.code === error.PERMISSION_DENIED
+            ? "Izin lokasi ditolak"
+            : "Lokasi gagal didapatkan",
+        );
         showToast(message);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
